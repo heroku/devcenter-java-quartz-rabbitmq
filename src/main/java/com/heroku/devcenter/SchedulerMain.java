@@ -38,7 +38,8 @@ public class SchedulerMain {
         public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
             
             try {
-                ConnectionFactory factory = RabbitFactoryUtil.getConnectionFactory();
+                ConnectionFactory factory = new ConnectionFactory();
+                factory.setUri(System.getenv("CLOUDAMQP_URL"));
                 Connection connection = factory.newConnection();
                 Channel channel = connection.createChannel();
                 String exchangeName = "sample-exchange";

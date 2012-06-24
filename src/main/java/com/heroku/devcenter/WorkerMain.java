@@ -14,7 +14,8 @@ public class WorkerMain {
 
     public static void main(String[] args) throws Exception {
 
-        ConnectionFactory factory = RabbitFactoryUtil.getConnectionFactory();
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setUri(System.getenv("CLOUDAMQP_URL"));
         Connection connection = factory.newConnection();
         Channel channel = connection.createChannel();
         String exchangeName = "sample-exchange";

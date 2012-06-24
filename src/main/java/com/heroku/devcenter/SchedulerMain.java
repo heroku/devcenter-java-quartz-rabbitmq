@@ -54,7 +54,7 @@ public class SchedulerMain {
                 logger.info("Message Sent: " + msg);
             }
             catch (Exception e) {
-                logger.error(e.getMessage());
+                logger.error(e.getMessage(), e);
             }
 
         }

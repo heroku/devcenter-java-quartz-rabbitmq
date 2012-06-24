@@ -103,34 +103,8 @@ If you want to test this locally then [install RabbitMQ](http://www.rabbitmq.com
 
         $ export CLOUDAMQP_URL="amqp://guest:guest@localhost:5672/%2f"
 
-Now use a helper class to connect to RabbitMQ based on the `CLOUDAMQP_URL` environment variable (the `RabbitFactoryUtil.java` file [in the example project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/RabbitFactoryUtil.java)):
 
-    package com.heroku.devcenter;
-    
-    import static java.lang.System.getenv;
-    import java.net.URI;
-    import java.net.URISyntaxException;
-    
-    import com.rabbitmq.client.ConnectionFactory;
-    
-    public class RabbitFactoryUtil {
-    
-        public static ConnectionFactory getConnectionFactory() throws URISyntaxException {
-            ConnectionFactory factory = new ConnectionFactory();
-    
-            URI uri = new URI(getenv("CLOUDAMQP_URL"));
-            factory.setUsername(uri.getUserInfo().split(":")[0]);
-            factory.setPassword(uri.getUserInfo().split(":")[1]);
-            factory.setHost(uri.getHost());
-            factory.setPort(uri.getPort());
-            factory.setVirtualHost(uri.getPath().substring(1));
-    
-            return factory;
-        }
-    
-    }
-
-The `RabbitFactoryUtil` class reads the `CLOUDAMQP_URL` environment variable and uses the connection information in the URL to create and return a RabbitMQ `ConnectionFactory` instance.  This will be used by the scheduler and worker processes to connect to the shared message queue.  This example uses an environment variable named `CLOUDAMQP_URL` because that is the way the [CloudAMQP Heroku Add-on](https://addons.heroku.com/cloudamqp) will provide it's connection information to the application.
+The `CLOUDAMQP_URL` environment variable will be used by the scheduler and worker processes to connect to the shared message queue.  This example uses that environment variable because that is the way the [CloudAMQP Heroku Add-on](https://addons.heroku.com/cloudamqp) will provide it's connection information to the application.
 
 The `SchedulerMain` class needs to be updated to add a new message onto a queue every time the `HelloJob` is executed.  Here is the new `HelloJob` class from the [SchedulerMain.java file in the sample project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/SchedulerMain.java):
 
@@ -140,7 +114,8 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
         public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
             
             try {
-                ConnectionFactory factory = RabbitFactoryUtil.getConnectionFactory();
+                ConnectionFactory factory = new ConnectionFactory();
+                factory.setUri(System.getenv("CLOUDAMQP_URL"));
                 Connection connection = factory.newConnection();
                 Channel channel = connection.createChannel();
                 String exchangeName = "sample-exchange";
@@ -156,7 +131,7 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
                 logger.info("Message Sent: " + msg);
             }
             catch (Exception e) {
-                logger.error(e.getMessage());
+                logger.error(e.getMessage(), e);
             }
 
         }
@@ -186,7 +161,8 @@ Now lets create a Java application that will pull messages from the queue and ha
     
         public static void main(String[] args) throws Exception {
     
-            ConnectionFactory factory = RabbitFactoryUtil.getConnectionFactory();
+            ConnectionFactory factory = new ConnectionFactory();
+            factory.setUri(System.getenv("CLOUDAMQP_URL"));
             Connection connection = factory.newConnection();
             Channel channel = connection.createChannel();
             String exchangeName = "sample-exchange";
@@ -210,10 +186,11 @@ Now lets create a Java application that will pull messages from the queue and ha
     
     }
 
+
 This class simply waits for new messages on the message queue and logs that it received them.  You can run this example locally by doing a build and then running the `WorkerMain` class:
 
-   $ mvn package
-   $ java -cp target/classes:target/dependency/* com.heroku.devcenter.WorkerMain
+    $ mvn package
+    $ java -cp target/classes:target/dependency/* com.heroku.devcenter.WorkerMain
 
 You can also run multiple instances of this example locally to see how the job processing can be horizontally distributed.
 

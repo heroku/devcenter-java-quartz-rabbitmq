@@ -26,7 +26,7 @@ public class SchedulerMain {
         
         Trigger trigger = newTrigger()
                 .startNow()
-                .withSchedule(repeatSecondlyForever(2))
+                .withSchedule(repeatSecondlyForever(5))
                 .build();
 
         scheduler.scheduleJob(jobDetail, trigger);
@@ -53,6 +53,7 @@ public class SchedulerMain {
                 byte[] body = msg.getBytes("UTF-8");
                 channel.basicPublish(exchangeName, routingKey, null, body);
                 logger.info("Message Sent: " + msg);
+                connection.close();
             }
             catch (Exception e) {
                 logger.error(e.getMessage(), e);

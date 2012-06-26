@@ -129,6 +129,7 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
                 byte[] body = msg.getBytes("UTF-8");
                 channel.basicPublish(exchangeName, routingKey, null, body);
                 logger.info("Message Sent: " + msg);
+                connection.close();
             }
             catch (Exception e) {
                 logger.error(e.getMessage(), e);
@@ -138,7 +139,7 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
         
     }
 
-In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 2 seconds.
+In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 5 seconds.
 
 
 Processing Jobs From a Queue
@@ -243,8 +244,12 @@ You can verify that this is happening by watching the Heroku logs for your appli
 
 You should see something like:
 
-*** NEED OUTPUT ***
+    2012-06-26T22:26:47+00:00 app[scheduler.1]: 100223 [DefaultQuartzScheduler_Worker-1] INFO com.heroku.devcenter.SchedulerMain - Message Sent: Sent at:1340749607126
+    2012-06-26T22:26:47+00:00 app[worker.2]: 104798 [main] INFO com.heroku.devcenter.WorkerMain - Message Received: Sent at:1340749607126
+    2012-06-26T22:26:52+00:00 app[scheduler.1]: 105252 [DefaultQuartzScheduler_Worker-2] INFO com.heroku.devcenter.SchedulerMain - Message Sent: Sent at:1340749612155
+    2012-06-26T22:26:52+00:00 app[worker.1]: 109738 [main] INFO com.heroku.devcenter.WorkerMain - Message Received: Sent at:1340749612155
 
+In this example execution the scheduler creates 2 messages which are handled by the two different worker Dynos.  This shows that the work is being scheduled and distributed correctly.
 
 Further Leaning
 ---------------

@@ -16,8 +16,10 @@ import static org.quartz.TriggerBuilder.newTrigger;
 public class SchedulerMain {
 
     final static Logger logger = LoggerFactory.getLogger(SchedulerMain.class);
+    final static ConnectionFactory factory = new ConnectionFactory();
     
     public static void main(String[] args) throws Exception {
+        factory.setUri(System.getenv("CLOUDAMQP_URL"));
         Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
 
         scheduler.start();
@@ -38,8 +40,6 @@ public class SchedulerMain {
         public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
             
             try {
-                ConnectionFactory factory = new ConnectionFactory();
-                factory.setUri(System.getenv("CLOUDAMQP_URL"));
                 Connection connection = factory.newConnection();
                 Channel channel = connection.createChannel();
                 String exchangeName = "sample-exchange";

@@ -72,12 +72,15 @@ Now a Java application can be used to schedule jobs.  Here is an example:
     
     }
 
+*** TODO: Minify ***
 Using Quartz a new `Scheduler` is created and started.  Then a new `JobDetail` is created for the `HelloJob` job.  In this example the `HelloJob` simply logs a simple message.  In Quartz a `JobDetail` object is the definition of a job.  The job itself is created using a `Trigger`.  The trigger in this application runs every 2 seconds, continuing forever.  The `scheduler` is then told to schedule the `jobDetail` job to run based on the `trigger`.  Quartz has a [very extensive API](http://quartz-scheduler.org/api/2.1.5/org/quartz/SimpleScheduleBuilder.html) for creating `Trigger` schedules.
 
 To test this application locally you can run the Maven build and then run the `SchedulerMain` Java class:
 
     $ mvn package
     $ java -cp target/classes:target/dependency/* com.heroku.devcenter.SchedulerMain
+
+*** TODO: Show output ***
 
 If the `HelloJob` actually did work itself then we would have a runtime bottleneck because we could not scale the scheduler and avoid duplicate jobs being scheduled.  Quartz does have a JDBC module that can use a database to prevent jobs from being duplicated but a simpler approach is to only run one instance of the scheduler and have the scheduled jobs added to a message queue where they can be processes in parallel by job worker processes.
 
@@ -228,13 +231,13 @@ This will run the Maven build for your project on Heroku and create a slug file 
 
 To allocate one Dyno to the `scheduler` process run:
 
-    $ heroku scale scheduler=1
+    $ heroku ps:scale scheduler=1
 
 This should begin adding messages to the queue every two seconds.
 
 To allocate two Dynos to the `worker` process run:
 
-    $ heroku scale worker=2
+    $ heroku ps:scale worker=2
 
 This will allocate two Dynos that will run the `WorkerMain` application which will pull messages from the queue and process them.
 

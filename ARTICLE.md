@@ -78,15 +78,36 @@ Now a Java application can be used to schedule jobs.  Here is an example:
     
     }
 
-*** TODO: Minify ***
-Using Quartz a new `Scheduler` is created and started.  Then a new `JobDetail` is created for the `HelloJob` job.  In this example the `HelloJob` simply logs a simple message.  In Quartz a `JobDetail` object is the definition of a job.  The job itself is created using a `Trigger`.  The trigger in this application runs every 2 seconds, continuing forever.  The `scheduler` is then told to schedule the `jobDetail` job to run based on the `trigger`.  Quartz has a [very extensive API](http://quartz-scheduler.org/api/2.1.5/org/quartz/SimpleScheduleBuilder.html) for creating `Trigger` schedules.
+This simple example creates a `Job` every two seconds that simply logs a message.  Quartz has a [very extensive API](http://quartz-scheduler.org/api/2.1.5/org/quartz/SimpleScheduleBuilder.html) for creating `Trigger` schedules.
 
 To test this application locally you can run the Maven build and then run the `SchedulerMain` Java class:
 
     $ mvn package
     $ java -cp target/classes:target/dependency/* com.heroku.devcenter.SchedulerMain
 
-*** TODO: Show output ***
+You will see output like the following:
+
+    :::term
+    40 [main] INFO org.quartz.impl.StdSchedulerFactory - Using default implementation for ThreadExecutor
+    44 [main] INFO org.quartz.simpl.SimpleThreadPool - Job execution threads will use class loader of thread: main
+    63 [main] INFO org.quartz.core.SchedulerSignalerImpl - Initialized Scheduler Signaller of type: class org.quartz.core.SchedulerSignalerImpl
+    64 [main] INFO org.quartz.core.QuartzScheduler - Quartz Scheduler v.2.1.5 created.
+    65 [main] INFO org.quartz.simpl.RAMJobStore - RAMJobStore initialized.
+    66 [main] INFO org.quartz.core.QuartzScheduler - Scheduler meta-data: Quartz Scheduler (v2.1.5) 'DefaultQuartzScheduler' with instanceId 'NON_CLUSTERED'
+      Scheduler class: 'org.quartz.core.QuartzScheduler' - running locally.
+      NOT STARTED.
+      Currently in standby mode.
+      Number of jobs executed: 0
+      Using thread pool 'org.quartz.simpl.SimpleThreadPool' - with 10 threads.
+      Using job-store 'org.quartz.simpl.RAMJobStore' - which does not support persistence. and is not clustered.
+    
+    66 [main] INFO org.quartz.impl.StdSchedulerFactory - Quartz scheduler 'DefaultQuartzScheduler' initialized from default resource file in Quartz package: 'quartz.properties'
+    66 [main] INFO org.quartz.impl.StdSchedulerFactory - Quartz scheduler version: 2.1.5
+    66 [main] INFO org.quartz.core.QuartzScheduler - Scheduler DefaultQuartzScheduler_$_NON_CLUSTERED started.
+    104 [DefaultQuartzScheduler_Worker-1] INFO com.heroku.devcenter.SchedulerMain - HelloJob executed
+    2084 [DefaultQuartzScheduler_Worker-2] INFO com.heroku.devcenter.SchedulerMain - HelloJob executed
+
+Press `Ctrl-C` to exit the app.
 
 If the `HelloJob` actually did work itself then we would have a runtime bottleneck because we could not scale the scheduler and avoid duplicate jobs being scheduled.  Quartz does have a JDBC module that can use a database to prevent jobs from being duplicated but a simpler approach is to only run one instance of the scheduler and have the scheduled jobs added to a message queue where they can be processes in parallel by job worker processes.
 
@@ -115,38 +136,74 @@ On Mac/Linux:
 
 The `CLOUDAMQP_URL` environment variable will be used by the scheduler and worker processes to connect to the shared message queue.  This example uses that environment variable because that is the way the [CloudAMQP Heroku Add-on](https://addons.heroku.com/cloudamqp) will provide it's connection information to the application.
 
-The `SchedulerMain` class needs to be updated to add a new message onto a queue every time the `HelloJob` is executed.  Here is the new `HelloJob` class from the [SchedulerMain.java file in the sample project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/SchedulerMain.java):
+The `SchedulerMain` class needs to be updated to add a new message onto a queue every time the `HelloJob` is executed.  Here are the new `SchedulerMain` and `HelloJob` classes from the [SchedulerMain.java file in the sample project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/SchedulerMain.java):
 
     :::java
-    public static class HelloJob implements Job {
+    package com.heroku.devcenter;
+    
+    
+    import com.rabbitmq.client.Channel;
+    import com.rabbitmq.client.Connection;
+    import com.rabbitmq.client.ConnectionFactory;
+    import org.quartz.*;
+    import org.quartz.impl.StdSchedulerFactory;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
+    
+    import static org.quartz.JobBuilder.newJob;
+    import static org.quartz.SimpleScheduleBuilder.repeatSecondlyForever;
+    import static org.quartz.TriggerBuilder.newTrigger;
+    
+    public class SchedulerMain {
+    
+        final static Logger logger = LoggerFactory.getLogger(SchedulerMain.class);
+        final static ConnectionFactory factory = new ConnectionFactory();
         
-        @Override
-        public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        public static void main(String[] args) throws Exception {
+            factory.setUri(System.getenv("CLOUDAMQP_URL"));
+            Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
+    
+            scheduler.start();
+    
+            JobDetail jobDetail = newJob(HelloJob.class).build();
             
-            try {
-                ConnectionFactory factory = new ConnectionFactory();
-                factory.setUri(System.getenv("CLOUDAMQP_URL"));
-                Connection connection = factory.newConnection();
-                Channel channel = connection.createChannel();
-                String exchangeName = "sample-exchange";
-                String queueName = "sample-queue";
-                String routingKey = "sample-key";
-                channel.exchangeDeclare(exchangeName, "direct", true);
-                channel.queueDeclare(queueName, true, false, false, null);
-                channel.queueBind(queueName, exchangeName, routingKey);
-
-                String msg = "Sent at:" + System.currentTimeMillis();
-                byte[] body = msg.getBytes("UTF-8");
-                channel.basicPublish(exchangeName, routingKey, null, body);
-                logger.info("Message Sent: " + msg);
-                connection.close();
-            }
-            catch (Exception e) {
-                logger.error(e.getMessage(), e);
-            }
-
+            Trigger trigger = newTrigger()
+                    .startNow()
+                    .withSchedule(repeatSecondlyForever(5))
+                    .build();
+    
+            scheduler.scheduleJob(jobDetail, trigger);
         }
-        
+    
+        public static class HelloJob implements Job {
+            
+            @Override
+            public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+                
+                try {
+                    Connection connection = factory.newConnection();
+                    Channel channel = connection.createChannel();
+                    String exchangeName = "sample-exchange";
+                    String queueName = "sample-queue";
+                    String routingKey = "sample-key";
+                    channel.exchangeDeclare(exchangeName, "direct", true);
+                    channel.queueDeclare(queueName, true, false, false, null);
+                    channel.queueBind(queueName, exchangeName, routingKey);
+    
+                    String msg = "Sent at:" + System.currentTimeMillis();
+                    byte[] body = msg.getBytes("UTF-8");
+                    channel.basicPublish(exchangeName, routingKey, null, body);
+                    logger.info("Message Sent: " + msg);
+                    connection.close();
+                }
+                catch (Exception e) {
+                    logger.error(e.getMessage(), e);
+                }
+    
+            }
+            
+        }
+    
     }
 
 In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 5 seconds.

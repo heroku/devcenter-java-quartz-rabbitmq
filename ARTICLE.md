@@ -17,8 +17,11 @@ To clone the sample project to your local computer run:
 
     :::term
     $ git clone https://github.com/heroku/devcenter-java-quartz-rabbitmq.git
+    Cloning into devcenter-java-quartz-rabbitmq...
+    
+    $ cd devcenter-java-quartz-rabbitmq/
 
-Scheduling Jobs with Quartz
+Scheduling jobs with Quartz
 ---------------------------
 
 A job scheduling [custom clock process](https://devcenter.heroku.com/articles/scheduled-jobs-custom-clock-processes) will be used to create jobs and add them to a queue.  To setup a custom clock process use the [Quartz](http://quartz-scheduler.org) library.  In Maven the dependency is declared with:
@@ -72,35 +75,24 @@ Now a Java application can be used to schedule jobs.  Here is an example:
             @Override
             public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
                 logger.info("HelloJob executed");
-            }
-            
-        }
-    
+            }            
+        }    
     }
 
-This simple example creates a `Job` every two seconds that simply logs a message.  Quartz has a [very extensive API](http://quartz-scheduler.org/api/2.1.5/org/quartz/SimpleScheduleBuilder.html) for creating `Trigger` schedules.
+This simple example creates a `HelloJob` every two seconds that simply logs a message.  Quartz has a [very extensive API](http://quartz-scheduler.org/api/2.1.5/org/quartz/SimpleScheduleBuilder.html) for creating `Trigger` schedules.
 
 To test this application locally you can run the Maven build and then run the `SchedulerMain` Java class:
 
-    $ mvn package
-    $ java -cp target/classes:target/dependency/* com.heroku.devcenter.SchedulerMain
-
-You will see output like the following:
-
     :::term
-    40 [main] INFO org.quartz.impl.StdSchedulerFactory - Using default implementation for ThreadExecutor
-    44 [main] INFO org.quartz.simpl.SimpleThreadPool - Job execution threads will use class loader of thread: main
-    63 [main] INFO org.quartz.core.SchedulerSignalerImpl - Initialized Scheduler Signaller of type: class org.quartz.core.SchedulerSignalerImpl
-    64 [main] INFO org.quartz.core.QuartzScheduler - Quartz Scheduler v.2.1.5 created.
-    65 [main] INFO org.quartz.simpl.RAMJobStore - RAMJobStore initialized.
-    66 [main] INFO org.quartz.core.QuartzScheduler - Scheduler meta-data: Quartz Scheduler (v2.1.5) 'DefaultQuartzScheduler' with instanceId 'NON_CLUSTERED'
-      Scheduler class: 'org.quartz.core.QuartzScheduler' - running locally.
-      NOT STARTED.
-      Currently in standby mode.
-      Number of jobs executed: 0
-      Using thread pool 'org.quartz.simpl.SimpleThreadPool' - with 10 threads.
-      Using job-store 'org.quartz.simpl.RAMJobStore' - which does not support persistence. and is not clustered.
+    $ mvn package
+    INFO] Scanning for projects...
+    [INFO]                                                                         
+    [INFO] ------------------------------------------------------------------------
+    [INFO] Building devcenter-java-quartz-rabbitmq 1.0-SNAPSHOT
+    [INFO] ------------------------------------------------------------------------
     
+    $ java -cp target/classes:target/dependency/* com.heroku.devcenter.SchedulerMain
+    ...
     66 [main] INFO org.quartz.impl.StdSchedulerFactory - Quartz scheduler 'DefaultQuartzScheduler' initialized from default resource file in Quartz package: 'quartz.properties'
     66 [main] INFO org.quartz.impl.StdSchedulerFactory - Quartz scheduler version: 2.1.5
     66 [main] INFO org.quartz.core.QuartzScheduler - Scheduler DefaultQuartzScheduler_$_NON_CLUSTERED started.
@@ -109,9 +101,9 @@ You will see output like the following:
 
 Press `Ctrl-C` to exit the app.
 
-If the `HelloJob` actually did work itself then we would have a runtime bottleneck because we could not scale the scheduler and avoid duplicate jobs being scheduled.  Quartz does have a JDBC module that can use a database to prevent jobs from being duplicated but a simpler approach is to only run one instance of the scheduler and have the scheduled jobs added to a message queue where they can be processes in parallel by job worker processes.
+If the `HelloJob` actually did work itself then we would have a runtime bottleneck because we could not scale the scheduler while avoiding duplicate jobs being scheduled.  Quartz does have a JDBC module that can use a database to prevent jobs from being duplicated but a simpler approach is to only run one instance of the scheduler and have the scheduled jobs added to a message queue where they can be processes in parallel by job worker processes.
 
-Queuing Jobs with a RabbitMQ
+Queuing jobs with RabbitMQ
 ----------------------------
 
 RabbitMQ can be used as a message queue so the scheduler process can be used just to add jobs to a queue and worker processes can be used to grab jobs from the queue and process them.  To add the RabbitMQ client library as a dependency in Maven specify the following in dependencies block of the `pom.xml` file:
@@ -140,7 +132,6 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
 
     :::java
     package com.heroku.devcenter;
-    
     
     import com.rabbitmq.client.Channel;
     import com.rabbitmq.client.Connection;
@@ -198,18 +189,15 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
                 }
                 catch (Exception e) {
                     logger.error(e.getMessage(), e);
-                }
-    
-            }
-            
-        }
-    
+                }    
+            }            
+        }    
     }
 
 In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 5 seconds.
 
-Processing Jobs From a Queue
-----------------------------
+Processing jobs
+---------------
 
 Next, create a Java application that will pull messages from the queue and handle them.  This application will also use the `RabbitFactoryUtil` to get a connection to RabbitMQ from the `CLOUDAMQP_URL` environment variable.  Here is the `WorkerMain` class from the [WorkerMain.java file in the example project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/WorkerMain.java):
 
@@ -248,10 +236,8 @@ Next, create a Java application that will pull messages from the queue and handl
                     String msg = new String(delivery.getBody(), "UTF-8");
                     logger.info("Message Received: " + msg);
                 }
-            }
-    
-        }
-    
+            }    
+        }    
     }
 
 This class simply waits for new messages on the message queue and logs that it received them.  You can run this example locally by doing a build and then running the `WorkerMain` class:
@@ -280,27 +266,48 @@ To run on Heroku you will need to push a Git repository to Heroku containing the
 
 Create a new application on Heroku from within the project's root directory:
 
+    :::term
     $ heroku create
+    Creating furious-cloud-2945... done, stack is cedar
+    http://furious-cloud-2945.herokuapp.com/ | git@heroku.com:furious-cloud-2945.git
+    Git remote heroku added
 
 Then add the CloudAMQP add-on to your application:
 
+    :::term
     $ heroku addons:add cloudamqp
+    Adding cloudamqp to furious-cloud-2945... done, v2 (free)
+    cloudamqp documentation available at: https://devcenter.heroku.com/articles/cloudamqp
 
 Now push your Git repository to Heroku:
 
+    :::term
     $ git push heroku master
+    Counting objects: 165, done.
+    Delta compression using up to 2 threads.
+    ...
+    -----> Heroku receiving push
+    -----> Java app detected
+    ...
+    -----> Discovering process types
+           Procfile declares types -> scheduler, worker
+    -----> Compiled slug size is 1.4MB
+    -----> Launching... done, v5
+           http://furious-cloud-2945.herokuapp.com deployed to Heroku
 
 This will run the Maven build for your project on Heroku and create a slug file containing the executable assets for your application.  To run the application you will need to allocate dynos to run each process type.  You should only allocate one dyno to run the `scheduler` process type to avoid duplicate job scheduling.  You can allocate as many dynos as needed to the `worker` process type since it is event driven and parallelizable through the RabbitMQ message queue.
 
 To allocate one dyno to the `scheduler` process type run:
 
+    :::term
     $ heroku ps:scale scheduler=1
+    Scaling scheduler processes... done, now running 1
 
-This should begin adding messages to the queue every five seconds.
+This should begin adding messages to the queue every file seconds. To allocate two dynos to the `worker` process type run:
 
-To allocate two dynos to the `worker` process type run:
-
+    :::term
     $ heroku ps:scale worker=2
+    Scaling worker processes... done, now running 2
 
 This will provision two dynos, each which will run the `WorkerMain` app and pull messages from the queue for processing. You can verify that this is happening by watching the Heroku logs for your application.  To open a feed of your logs run:
 
@@ -313,7 +320,7 @@ This will provision two dynos, each which will run the `WorkerMain` app and pull
 
 In this example execution the scheduler creates 2 messages which are handled by the two different worker dynos (`worker.1` and `worker.2`).  This shows that the work is being scheduled and distributed correctly.
 
-Further Leaning
+Further learning
 ---------------
 
 This example application just shows the basics for architecting a scalable and reliable system for scheduling and processing background jobs.  To learn more see:

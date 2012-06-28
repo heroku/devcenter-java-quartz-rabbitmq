@@ -21,7 +21,7 @@ To clone the sample project to your local computer run:
     
     $ cd devcenter-java-quartz-rabbitmq/
 
-Scheduling Jobs with Quartz
+Scheduling jobs with Quartz
 ---------------------------
 
 A job scheduling [custom clock process](https://devcenter.heroku.com/articles/scheduled-jobs-custom-clock-processes) will be used to create jobs and add them to a queue.  To setup a custom clock process use the [Quartz](http://quartz-scheduler.org) library.  In Maven the dependency is declared with:
@@ -103,7 +103,7 @@ Press `Ctrl-C` to exit the app.
 
 If the `HelloJob` actually did work itself then we would have a runtime bottleneck because we could not scale the scheduler while avoiding duplicate jobs being scheduled.  Quartz does have a JDBC module that can use a database to prevent jobs from being duplicated but a simpler approach is to only run one instance of the scheduler and have the scheduled jobs added to a message queue where they can be processes in parallel by job worker processes.
 
-Queuing Jobs with a RabbitMQ
+Queuing jobs with RabbitMQ
 ----------------------------
 
 RabbitMQ can be used as a message queue so the scheduler process can be used just to add jobs to a queue and worker processes can be used to grab jobs from the queue and process them.  To add the RabbitMQ client library as a dependency in Maven specify the following in dependencies block of the `pom.xml` file:
@@ -196,8 +196,8 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
 
 In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 5 seconds.
 
-Processing Jobs From a Queue
-----------------------------
+Processing jobs
+---------------
 
 Next, create a Java application that will pull messages from the queue and handle them.  This application will also use the `RabbitFactoryUtil` to get a connection to RabbitMQ from the `CLOUDAMQP_URL` environment variable.  Here is the `WorkerMain` class from the [WorkerMain.java file in the example project](https://github.com/heroku/devcenter-java-quartz-rabbitmq/blob/master/src/main/java/com/heroku/devcenter/WorkerMain.java):
 
@@ -320,7 +320,7 @@ This will provision two dynos, each which will run the `WorkerMain` app and pull
 
 In this example execution the scheduler creates 2 messages which are handled by the two different worker dynos (`worker.1` and `worker.2`).  This shows that the work is being scheduled and distributed correctly.
 
-Further Leaning
+Further learning
 ---------------
 
 This example application just shows the basics for architecting a scalable and reliable system for scheduling and processing background jobs.  To learn more see:

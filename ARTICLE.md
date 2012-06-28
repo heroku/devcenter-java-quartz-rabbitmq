@@ -296,7 +296,7 @@ To allocate one dyno to the `scheduler` process type run:
 
     $ heroku ps:scale scheduler=1
 
-This should begin adding messages to the queue every two seconds.
+This should begin adding messages to the queue every five seconds.
 
 To allocate two dynos to the `worker` process type run:
 

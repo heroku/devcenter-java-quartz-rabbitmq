@@ -45,18 +45,14 @@ public class SchedulerMain {
             try {
                 Connection connection = factory.newConnection();
                 Channel channel = connection.createChannel();
-                String exchangeName = "sample-exchange";
-                String queueName = "sample-queue";
-                String routingKey = "sample-key";
-                channel.exchangeDeclare(exchangeName, "direct", true);
+                String queueName = "work-queue-1";
                 Map<String, Object> params = new HashMap<String, Object>();
                 params.put("x-ha-policy", "all");
                 channel.queueDeclare(queueName, true, false, false, params);
-                channel.queueBind(queueName, exchangeName, routingKey);
 
                 String msg = "Sent at:" + System.currentTimeMillis();
                 byte[] body = msg.getBytes("UTF-8");
-                channel.basicPublish(exchangeName, routingKey, MessageProperties.PERSISTENT_TEXT_PLAIN, body);
+                channel.basicPublish("", queueName, MessageProperties.PERSISTENT_TEXT_PLAIN, body);
                 logger.info("Message Sent: " + msg);
                 connection.close();
             }

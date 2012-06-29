@@ -9,6 +9,9 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.SimpleScheduleBuilder.repeatSecondlyForever;
 import static org.quartz.TriggerBuilder.newTrigger;
@@ -46,7 +49,9 @@ public class SchedulerMain {
                 String queueName = "sample-queue";
                 String routingKey = "sample-key";
                 channel.exchangeDeclare(exchangeName, "direct", true);
-                channel.queueDeclare(queueName, true, false, false, null);
+                Map<String, Object> params = new HashMap<String, Object>();
+                params.put("x-ha-policy", "all");
+                channel.queueDeclare(queueName, true, false, false, params);
                 channel.queueBind(queueName, exchangeName, routingKey);
 
                 String msg = "Sent at:" + System.currentTimeMillis();

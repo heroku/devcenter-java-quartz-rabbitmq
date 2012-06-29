@@ -133,13 +133,18 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
     :::java
     package com.heroku.devcenter;
     
+    
     import com.rabbitmq.client.Channel;
     import com.rabbitmq.client.Connection;
     import com.rabbitmq.client.ConnectionFactory;
+    import com.rabbitmq.client.MessageProperties;
     import org.quartz.*;
     import org.quartz.impl.StdSchedulerFactory;
     import org.slf4j.Logger;
     import org.slf4j.LoggerFactory;
+    
+    import java.util.HashMap;
+    import java.util.Map;
     
     import static org.quartz.JobBuilder.newJob;
     import static org.quartz.SimpleScheduleBuilder.repeatSecondlyForever;
@@ -174,25 +179,27 @@ The `SchedulerMain` class needs to be updated to add a new message onto a queue 
                 try {
                     Connection connection = factory.newConnection();
                     Channel channel = connection.createChannel();
-                    String exchangeName = "sample-exchange";
-                    String queueName = "sample-queue";
-                    String routingKey = "sample-key";
-                    channel.exchangeDeclare(exchangeName, "direct", true);
-                    channel.queueDeclare(queueName, true, false, false, null);
-                    channel.queueBind(queueName, exchangeName, routingKey);
+                    String queueName = "work-queue-1";
+                    Map<String, Object> params = new HashMap<String, Object>();
+                    params.put("x-ha-policy", "all");
+                    channel.queueDeclare(queueName, true, false, false, params);
     
                     String msg = "Sent at:" + System.currentTimeMillis();
                     byte[] body = msg.getBytes("UTF-8");
-                    channel.basicPublish(exchangeName, routingKey, null, body);
+                    channel.basicPublish("", queueName, MessageProperties.PERSISTENT_TEXT_PLAIN, body);
                     logger.info("Message Sent: " + msg);
                     connection.close();
                 }
                 catch (Exception e) {
                     logger.error(e.getMessage(), e);
-                }    
-            }            
-        }    
+                }
+    
+            }
+            
+        }
+    
     }
+
 
 In this example every time the `HelloJob` is executed it adds a message onto a RabbitMQ message queue simply containing a String with the time the String was created.  Running the updated `SchedulerMain` should add a new message to the queue every 5 seconds.
 
@@ -204,12 +211,17 @@ Next, create a Java application that will pull messages from the queue and handl
     :::java
     package com.heroku.devcenter;
     
+    
     import com.rabbitmq.client.Channel;
     import com.rabbitmq.client.Connection;
     import com.rabbitmq.client.ConnectionFactory;
     import com.rabbitmq.client.QueueingConsumer;
     import org.slf4j.Logger;
     import org.slf4j.LoggerFactory;
+    
+    import java.util.Collections;
+    import java.util.HashMap;
+    import java.util.Map;
     
     public class WorkerMain {
     
@@ -221,24 +233,26 @@ Next, create a Java application that will pull messages from the queue and handl
             factory.setUri(System.getenv("CLOUDAMQP_URL"));
             Connection connection = factory.newConnection();
             Channel channel = connection.createChannel();
-            String exchangeName = "sample-exchange";
-            String queueName = "sample-queue";
-            String routingKey = "sample-key";
-            channel.exchangeDeclare(exchangeName, "direct", true);
-            channel.queueDeclare(queueName, true, false, false, null);
-            channel.queueBind(queueName, exchangeName, routingKey);
+            String queueName = "work-queue-1";
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("x-ha-policy", "all");
+            channel.queueDeclare(queueName, true, false, false, params);
             QueueingConsumer consumer = new QueueingConsumer(channel);
-            channel.basicConsume(queueName, true, consumer);
-    
+            channel.basicConsume(queueName, false, consumer);
+           
             while (true) {
-                QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+                QueueingConsumer.Delivery delivery = consumer.nextDelivery(); 
                 if (delivery != null) {
                     String msg = new String(delivery.getBody(), "UTF-8");
                     logger.info("Message Received: " + msg);
+                    channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 }
-            }    
-        }    
+            }
+    
+        }
+    
     }
+
 
 This class simply waits for new messages on the message queue and logs that it received them.  You can run this example locally by doing a build and then running the `WorkerMain` class:
 

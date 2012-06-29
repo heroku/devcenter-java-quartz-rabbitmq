@@ -56,7 +56,7 @@ public class SchedulerMain {
 
                 String msg = "Sent at:" + System.currentTimeMillis();
                 byte[] body = msg.getBytes("UTF-8");
-                channel.basicPublish(exchangeName, routingKey, null, body);
+                channel.basicPublish(exchangeName, routingKey, MessageProperties.PERSISTENT_TEXT_PLAIN, body);
                 logger.info("Message Sent: " + msg);
                 connection.close();
             }

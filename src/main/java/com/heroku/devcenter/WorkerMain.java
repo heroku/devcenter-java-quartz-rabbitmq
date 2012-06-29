@@ -22,16 +22,12 @@ public class WorkerMain {
         factory.setUri(System.getenv("CLOUDAMQP_URL"));
         Connection connection = factory.newConnection();
         Channel channel = connection.createChannel();
-        String exchangeName = "sample-exchange";
-        String queueName = "sample-queue";
-        String routingKey = "sample-key";
-        channel.exchangeDeclare(exchangeName, "direct", true);
+        String queueName = "work-queue-1";
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("x-ha-policy", "all");
         channel.queueDeclare(queueName, true, false, false, params);
-        channel.queueBind(queueName, exchangeName, routingKey);
         QueueingConsumer consumer = new QueueingConsumer(channel);
-        channel.basicConsume("hello", false, consumer);
+        channel.basicConsume(queueName, false, consumer);
        
         while (true) {
             QueueingConsumer.Delivery delivery = consumer.nextDelivery(); 
